@@ -32,16 +32,15 @@ export function OAuthButtons({ isLoading: parentIsLoading }: OAuthButtonsProps) 
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
   async function handleOAuthSignIn(provider: "google" | "github") {
     try {
       setIsLoading(true)
       console.log(`[v0] Starting ${provider} OAuth sign-in`)
 
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
       const redirectUrl = `${appUrl}/auth/callback`
 
@@ -54,6 +53,7 @@ export function OAuthButtons({ isLoading: parentIsLoading }: OAuthButtonsProps) 
 
       if (error) {
         console.error(`[v0] ${provider} OAuth error:`, error)
+        setIsLoading(false)
         return
       }
 
