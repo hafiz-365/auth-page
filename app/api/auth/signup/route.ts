@@ -61,14 +61,17 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       console.error('Auth error:', authError)
-      // Check for specific error messages
-      if (authError.message?.includes('already registered')) {
+      // Check for specific error codes/messages
+      if (authError.code === 'email_exists' || authError.message?.includes('already registered')) {
         return NextResponse.json(
-          { error: 'This email is already registered' },
-          { status: 400 }
+          { error: 'This email is already registered. Please use a different email or try logging in.' },
+          { status: 409 }
         )
       }
-      throw authError
+      return NextResponse.json(
+        { error: authError.message || 'Failed to create user account' },
+        { status: 400 }
+      )
     }
 
     if (!authData.user) {
@@ -114,10 +117,25 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Signup error:', error)
+    
+    // Handle specific auth errors
+    if (error?.__isAuthError) {
+      if (error.code === 'email_exists') {
+        return NextResponse.json(
+          { error: 'This email is already registered. Please use a different email or try logging in.' },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json(
+        { error: error.message || 'Authentication failed' },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'An error occurred during signup' },
+      { error: 'An error occurred during signup. Please try again.' },
       { status: 500 }
     )
   }

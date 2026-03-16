@@ -130,23 +130,38 @@ export default function SignUpPage() {
         >
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p id="error-summary-title" className="font-medium text-destructive">
-                {errors.form ? errors.form : "Please fix the following errors:"}
-              </p>
-              {!errors.form && (
-                <ul className="text-sm text-destructive/90 space-y-1">
-                  {errorList.map(([field, message]) => (
-                    <li key={field}>
-                      <a 
-                        href={`#${field}`}
-                        className="underline underline-offset-2 hover:text-destructive"
-                      >
-                        {message}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+            <div className="space-y-1 flex-1">
+              {errors.form ? (
+                <>
+                  <p id="error-summary-title" className="font-medium text-destructive">
+                    {errors.form}
+                  </p>
+                  {errors.form.includes("already registered") && (
+                    <p className="text-sm text-destructive/90 mt-2">
+                      <Link href="/auth/login" className="underline underline-offset-2 hover:text-destructive">
+                        Go to login page
+                      </Link>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p id="error-summary-title" className="font-medium text-destructive">
+                    Please fix the following errors:
+                  </p>
+                  <ul className="text-sm text-destructive/90 space-y-1">
+                    {errorList.map(([field, message]) => (
+                      <li key={field}>
+                        <a 
+                          href={`#${field}`}
+                          className="underline underline-offset-2 hover:text-destructive"
+                        >
+                          {message}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           </div>
