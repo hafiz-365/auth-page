@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    // Create a Supabase client for auth operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
     // Sign in user
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -45,8 +49,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get customer data
-    const { data: customer, error: customerError } = await supabase
+    // Create a service role client to fetch customer data (bypasses RLS)
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
+
+    // Get customer data using service role
+    const { data: customer, error: customerError } = await supabaseAdmin
       .from('customers')
       .select('*')
       .eq('id', data.user.id)

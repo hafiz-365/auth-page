@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -30,24 +30,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    // Create a Supabase client with service role key (for server-side operations)
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
+
+    // Create a regular client for auth operations (uses anon key)
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
     // Sign up user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          firstName,
-          lastName,
-          phone,
-        },
+      user_metadata: {
+        firstName,
+        lastName,
+        phone,
       },
     })
 
     if (authError) {
+      console.error('Auth error:', authError)
       // Check for specific error messages
-      if (authError.message.includes('already registered')) {
+      if (authError.message?.includes('already registered')) {
         return NextResponse.json(
           { error: 'This email is already registered' },
           { status: 400 }
@@ -63,8 +78,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert user data into customers table
-    const { error: insertError } = await supabase
+    // Insert user data into customers table using service role (bypasses RLS)
+    const { error: insertError } = await supabaseAdmin
       .from('customers')
       .insert([
         {
@@ -73,37 +88,29 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           email,
           phone,
+          is_active: true,
           created_at: new Date().toISOString(),
         },
       ])
 
     if (insertError) {
-      // If insert fails, we should ideally delete the auth user
-      // but for now we'll just return an error
       console.error('Error inserting customer data:', insertError)
+      // Attempt to delete the auth user if insert fails
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json(
         { error: 'Failed to create customer record' },
         { status: 400 }
       )
     }
 
-    // Sign in the user after successful signup
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (signInError) {
-      return NextResponse.json(
-        { error: 'Signup successful but auto-login failed. Please login manually.' },
-        { status: 200 }
-      )
-    }
-
+    // Return success response
     return NextResponse.json(
       { 
         message: 'Signup successful',
-        user: authData.user,
+        user: {
+          id: authData.user.id,
+          email: authData.user.email,
+        },
       },
       { status: 201 }
     )
