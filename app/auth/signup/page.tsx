@@ -59,10 +59,43 @@ export default function SignUpPage() {
       return
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    router.push("/auth/thank-you")
+    try {
+      // Call signup API
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password,
+          phone,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setErrors({ form: data.error || "Signup failed. Please try again." })
+        setIsLoading(false)
+        setTimeout(() => {
+          errorSummaryRef.current?.focus()
+        }, 100)
+        return
+      }
+
+      // Success - redirect to thank you page
+      router.push("/auth/thank-you")
+    } catch (error) {
+      console.error("Signup error:", error)
+      setErrors({ form: "An error occurred. Please try again." })
+      setIsLoading(false)
+      setTimeout(() => {
+        errorSummaryRef.current?.focus()
+      }, 100)
+    }
   }
 
   return (
@@ -99,20 +132,22 @@ export default function SignUpPage() {
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p id="error-summary-title" className="font-medium text-destructive">
-                Please fix the following errors:
+                {errors.form ? errors.form : "Please fix the following errors:"}
               </p>
-              <ul className="text-sm text-destructive/90 space-y-1">
-                {errorList.map(([field, message]) => (
-                  <li key={field}>
-                    <a 
-                      href={`#${field}`}
-                      className="underline underline-offset-2 hover:text-destructive"
-                    >
-                      {message}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              {!errors.form && (
+                <ul className="text-sm text-destructive/90 space-y-1">
+                  {errorList.map(([field, message]) => (
+                    <li key={field}>
+                      <a 
+                        href={`#${field}`}
+                        className="underline underline-offset-2 hover:text-destructive"
+                      >
+                        {message}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
