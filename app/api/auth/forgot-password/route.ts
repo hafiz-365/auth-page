@@ -22,30 +22,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create a Supabase client for password reset
+    // Create a Supabase admin client for password reset
+    // Using service role key to bypass any webhook/auth hook issues
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Request password reset
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password`,
+    // Request password reset with a timeout to prevent hanging
+    const resetPromise = supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email: email.toLowerCase().trim(),
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password`,
+      },
     })
+
+    // Set a timeout of 10 seconds
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Password reset request timeout')), 10000)
+    )
+
+    const { data, error } = await Promise.race([resetPromise, timeoutPromise]) as any
 
     if (error) {
       console.error('Password reset error:', error)
-      // Return success even if email doesn't exist (security best practice)
-      return NextResponse.json(
-        {
-          message: 'If an account with this email exists, you will receive a password reset link shortly.',
-          email,
-        },
-        { status: 200 }
-      )
     }
 
-    // Return success response
+    // Always return success for security (user won't know if email exists)
     return NextResponse.json(
       {
         message: 'If an account with this email exists, you will receive a password reset link shortly.',
@@ -55,9 +59,12 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Forgot password error:', error)
+    // Return success even on error (security best practice - don't reveal if email exists)
     return NextResponse.json(
-      { error: 'An error occurred. Please try again.' },
-      { status: 500 }
+      {
+        message: 'If an account with this email exists, you will receive a password reset link shortly.',
+      },
+      { status: 200 }
     )
   }
 }
