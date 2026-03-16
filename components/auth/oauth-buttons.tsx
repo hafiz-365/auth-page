@@ -1,5 +1,8 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -25,14 +28,53 @@ interface OAuthButtonsProps {
   isLoading?: boolean
 }
 
-export function OAuthButtons({ isLoading }: OAuthButtonsProps) {
+export function OAuthButtons({ isLoading: parentIsLoading }: OAuthButtonsProps) {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+
+  async function handleOAuthSignIn(provider: "google" | "github") {
+    try {
+      setIsLoading(true)
+      console.log(`[v0] Starting ${provider} OAuth sign-in`)
+
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+      const redirectUrl = `${appUrl}/auth/callback`
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+        },
+      })
+
+      if (error) {
+        console.error(`[v0] ${provider} OAuth error:`, error)
+        setIsLoading(false)
+        return
+      }
+
+      if (data?.url) {
+        console.log(`[v0] Redirecting to ${provider} OAuth URL`)
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error(`[v0] ${provider} sign-in error:`, error)
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <Button
         type="button"
         variant="outline"
         className="w-full h-12 border-border bg-transparent hover:bg-secondary transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-        disabled={isLoading}
+        disabled={isLoading || parentIsLoading}
+        onClick={() => handleOAuthSignIn("google")}
       >
         <GoogleIcon className="mr-2 h-5 w-5" />
         Continue with Google
@@ -41,7 +83,8 @@ export function OAuthButtons({ isLoading }: OAuthButtonsProps) {
         type="button"
         variant="outline"
         className="w-full h-12 border-border bg-transparent hover:bg-secondary transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-        disabled={isLoading}
+        disabled={isLoading || parentIsLoading}
+        onClick={() => handleOAuthSignIn("github")}
       >
         <GitHubIcon className="mr-2 h-5 w-5" />
         Continue with GitHub
