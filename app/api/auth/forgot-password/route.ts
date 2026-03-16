@@ -26,27 +26,41 @@ export async function POST(request: NextRequest) {
     // Using service role key to bypass any webhook/auth hook issues
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     )
 
-    // Request password reset with a timeout to prevent hanging
-    const resetPromise = supabase.auth.admin.generateLink({
-      type: 'recovery',
-      email: email.toLowerCase().trim(),
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password`,
-      },
-    })
+    try {
+      console.log('[v0] Attempting password reset for email:', email)
+      
+      // Request password reset with a timeout to prevent hanging
+      const resetPromise = supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: email.toLowerCase().trim(),
+      })
 
-    // Set a timeout of 10 seconds
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Password reset request timeout')), 10000)
-    )
+      // Set a timeout of 8 seconds to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Password reset request timeout')), 8000)
+      )
 
-    const { data, error } = await Promise.race([resetPromise, timeoutPromise]) as any
-
-    if (error) {
-      console.error('Password reset error:', error)
+      const result = await Promise.race([resetPromise, timeoutPromise]) as any
+      
+      console.log('[v0] Password reset result:', result?.error ? 'error' : 'success')
+      
+      if (result?.error) {
+        console.error('[v0] Password reset error details:', result.error)
+      } else if (result?.data) {
+        console.log('[v0] Password reset link generated successfully')
+      }
+    } catch (resetError: any) {
+      console.error('[v0] Password reset attempt failed:', resetError?.message || resetError)
+      // Continue to return success for security (don't reveal if email exists)
     }
 
     // Always return success for security (user won't know if email exists)
